@@ -1,6 +1,7 @@
 import os from 'os';
 import inquirer from 'inquirer';
 import shell from 'shelljs';
+import { spawn } from 'child_process'; // Import the spawn function
 
 async function askForInstance() {
     return await inquirer.prompt([
@@ -47,20 +48,24 @@ async function askForInstance() {
     });
 
     for (let { address, username } of instances) {
-        let cmd;
+        let cmd, args;
         const sshCommand = `ssh -v -i "${pem}" ${username}@${address.trim()}`;
 
         if (osChoice === 'macOS') {
-            cmd = `osascript -e 'tell app "Terminal" to do script "ssh -v -i \\"${pem}\\" ${username}@${address.trim()}"'`;
-            // cmd = `osascript -e 'tell app "Terminal" to do script "echo hello"'`;
-
+            cmd = 'osascript';
+            args = ['-e', `tell app "Terminal" to do script "ssh -v -i \\"${pem}\\" ${username}@${address.trim()}"`];
         } else if (osChoice === 'Linux') {
-            cmd = `gnome-terminal -- ${sshCommand} &`;
+            cmd = 'gnome-terminal';
+            args = ['--', `${sshCommand}`];
         } else if (osChoice === 'Windows') {
-            cmd = `start cmd.exe /k "${sshCommand}"`;
+            cmd = 'cmd.exe';
+            args = ['/k', `${sshCommand}`];
         }
 
-        console.log(cmd);
-        shell.exec(cmd);
+        console.log(cmd, args);
+        spawn(cmd, args, {
+            detached: true, 
+            stdio: 'ignore' 
+        }).unref(); // This will spawn a child process that is independent of its parent
     }
 })();
