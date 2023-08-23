@@ -50,7 +50,7 @@ async function askForInstance() {
     for (let { address, username } of instances) {
         let cmd, args;
         const sshCommand = `ssh -v -i "${pem}" ${username}@${address.trim()}`;
-
+    
         if (osChoice === 'macOS') {
             cmd = 'osascript';
             args = ['-e', `tell app "Terminal" to do script "ssh -v -i \\"${pem}\\" ${username}@${address.trim()}"`];
@@ -59,13 +59,17 @@ async function askForInstance() {
             args = ['--', `${sshCommand}`];
         } else if (osChoice === 'Windows') {
             cmd = 'cmd.exe';
-            args = ['/k', `${sshCommand}`];
+            args = [
+                '/c',
+                `start cmd.exe /k ssh -v -i "${pem}" ${username}@${address.trim()} && pause`
+            ];
         }
-
+    
         console.log(cmd, args);
         spawn(cmd, args, {
+            shell: true,
             detached: true, 
-            stdio: 'ignore' 
-        }).unref(); // This will spawn a child process that is independent of its parent
+            stdio: 'ignore'  // This change may help with the immediate termination problem
+        }).unref(); 
     }
 })();
