@@ -1,0 +1,20 @@
+{
+  "name": "ec2ms",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "A tool to SSH into multiple EC2 instances.",
+  "main": "index.js",
+  "bin": {
+    "ec2ms": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "inquirer": "^9.2.10",
+    "shelljs": "^0.8.5"
+  }
+}
