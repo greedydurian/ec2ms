@@ -2,22 +2,70 @@ import os from 'os';
 import inquirer from 'inquirer';
 import shell from 'shelljs';
 import { spawn } from 'child_process'; // Import the spawn function
+import fs from 'fs';
+
+const cacheFilePath = './cachedTags.json';
+
+let cachedTags = {};
+
+function loadCachedTags() {
+    if (fs.existsSync(cacheFilePath)) {
+        cachedTags = JSON.parse(fs.readFileSync(cacheFilePath, 'utf-8'));
+    }
+}
+
+function saveCachedTags() {
+    fs.writeFileSync(cacheFilePath, JSON.stringify(cachedTags));
+}
+
 
 async function askForInstance() {
-    return await inquirer.prompt([
+    loadCachedTags();
+
+    const { action } = await inquirer.prompt([
         {
-            type: 'input',
-            name: 'address',
-            message: 'Enter the EC2 address:'
-        },
-        {
-            type: 'input',
-            name: 'username',
-            message: 'Enter the SSH username for this instance:',
-            default: 'ubuntu'
+            type: 'list',
+            name: 'action',
+            message: 'Do you want to use a saved tag or enter new values?',
+            choices: [...Object.keys(cachedTags), 'Enter new values'],
+            default: 'Enter new values'
         }
     ]);
+
+    if (action !== 'Enter new values') {
+        return cachedTags[action];
+    }
+
+    const address = await inquirer.prompt({
+        type: 'input',
+        name: 'address',
+        message: 'Enter the EC2 address:'
+    });
+
+    const username = await inquirer.prompt({
+        type: 'input',
+        name: 'username',
+        message: 'Enter the SSH username for this instance:',
+        default: 'ubuntu'
+    });
+
+    const { tag } = await inquirer.prompt({
+        type: 'input',
+        name: 'tag',
+        message: 'Save these inputs under which tag?'
+    });
+
+    const instance = {
+        address: address.address,
+        username: username.username
+    };
+
+    cachedTags[tag] = instance;
+    saveCachedTags();
+
+    return instance;
 }
+
 
 (async function() {
     const instances = [];
