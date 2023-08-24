@@ -1,0 +1,10 @@
+{
+    "test1": {
+        "address": "ec2-54-255-94-202.ap-southeast-1.compute.amazonaws.com",
+        "username": "ubuntu"
+    },
+    "test2": {
+        "address": "ec2-13-250-5-230.ap-southeast-1.compute.amazonaws.com",
+        "username": "ubuntu"
+    }
+}

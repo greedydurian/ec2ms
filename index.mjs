@@ -3,7 +3,7 @@ import inquirer from 'inquirer';
 import shell from 'shelljs';
 import { spawn } from 'child_process'; // Import the spawn function
 import fs from 'fs';
-import { loadCachedTags, saveCachedTags } from './cacheManager.js';
+import { loadCachedTags, saveCachedTags, manageTags, cachedTags } from './cacheManager.js';
 
 (async function() {
     console.log(`
@@ -15,6 +15,34 @@ import { loadCachedTags, saveCachedTags } from './cacheManager.js';
                                    
  `   );
 })();
+
+
+async function mainMenu() {
+    const { mainChoice } = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'mainChoice',
+            message: 'What would you like to do?',
+            choices: ['Manage EC2 instances', 'Manage saved tags', 'Exit'],
+            default: 'Manage EC2 instances'
+        }
+    ]);
+
+    switch (mainChoice) {
+        case 'Manage EC2 instances':
+            await manageEC2Instances();
+            break;
+        case 'Manage saved tags':
+            await manageTags();
+            break;
+        case 'Exit':
+            console.log('Goodbye!');
+            process.exit(0);
+    }
+
+    await mainMenu();  // loop back to main menu
+}
+
 
 
 async function askForInstance() {
@@ -65,7 +93,8 @@ async function askForInstance() {
 }
 
 
-(async function() {
+
+async function manageEC2Instances() {
     const instances = [];
     const { numOfInstances } = await inquirer.prompt({
         type: 'input',
@@ -128,4 +157,6 @@ async function askForInstance() {
             stdio: 'inherit'
         }).unref(); 
     }
-})();
+};
+
+mainMenu()
