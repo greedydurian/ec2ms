@@ -3,20 +3,18 @@ import inquirer from 'inquirer';
 import shell from 'shelljs';
 import { spawn } from 'child_process'; // Import the spawn function
 import fs from 'fs';
+import { loadCachedTags, saveCachedTags } from './cacheManager.js';
 
-const cacheFilePath = './cachedTags.json';
-
-let cachedTags = {};
-
-function loadCachedTags() {
-    if (fs.existsSync(cacheFilePath)) {
-        cachedTags = JSON.parse(fs.readFileSync(cacheFilePath, 'utf-8'));
-    }
-}
-
-function saveCachedTags() {
-    fs.writeFileSync(cacheFilePath, JSON.stringify(cachedTags));
-}
+(async function() {
+    console.log(`
+    __  ____  __ ____   ____   ___ 
+   / / / /\ \/ // __ \ / __ \ /   |
+  / /_/ /  \  // / / // /_/ // /| |
+ / __  /   / // /_/ // _, _// ___ |
+/_/ /_/   /_//_____//_/ |_|/_/  |_|
+                                   
+ `   );
+})();
 
 
 async function askForInstance() {
