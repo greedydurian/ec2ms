@@ -101,7 +101,9 @@ async function askForInstance() {
     
         if (osChoice === 'macOS') {
             cmd = 'osascript';
-            args = ['-e', `tell app "Terminal" to do script "ssh -v -i \\"${pem}\\" ${username}@${address.trim()}"`];
+            let scriptPart = 'tell application "Terminal" to do script "ssh -v -i ' + pem + ' ' + username + '@' + address.trim() + '"';
+            args = ['-e', scriptPart];
+
         } else if (osChoice === 'Linux') {
             cmd = 'gnome-terminal';
             args = ['--', `${sshCommand}`];
@@ -112,12 +114,20 @@ async function askForInstance() {
                 `start cmd.exe /k ssh -v -i "${pem}" ${username}@${address.trim()} && pause`
             ];
         }
+
+        let shellOption;
+
+        if (osChoice === 'macOS') {
+            shellOption = false;
+        } else if (osChoice === 'Windows') {
+            shellOption = true;
+        }
     
-        console.log(cmd, args);
+        console.log('executing', cmd, args);
         spawn(cmd, args, {
-            shell: true,
+            shell: shellOption,
             detached: true, 
-            stdio: 'ignore'  // This change may help with the immediate termination problem
+            stdio: 'inherit'
         }).unref(); 
     }
 })();
