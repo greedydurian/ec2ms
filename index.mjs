@@ -1,9 +1,9 @@
 import os from 'os';
 import inquirer from 'inquirer';
-import shell from 'shelljs';
 import { spawn } from 'child_process'; // Import the spawn function
 import fs from 'fs';
 import { loadCachedTags, saveCachedTags, manageTags, cachedTags } from './cacheManager.js';
+import { monitor, logToFile } from './monitor.js';
 
 (async function() {
     console.log(`
@@ -83,7 +83,8 @@ async function askForInstance() {
 
     const instance = {
         address: address.address,
-        username: username.username
+        username: username.username,
+
     };
 
     cachedTags[tag] = instance;
@@ -91,8 +92,6 @@ async function askForInstance() {
 
     return instance;
 }
-
-
 
 async function manageEC2Instances() {
     const instances = [];
@@ -103,16 +102,17 @@ async function manageEC2Instances() {
         validate: value => !isNaN(value) ? true : 'Please enter a valid number.'
     });
 
-    for (let i = 0; i < numOfInstances; i++) {
-        const instance = await askForInstance();
-        instances.push(instance);
-    }
-
     const { pem } = await inquirer.prompt({
         type: 'input',
         name: 'pem',
         message: 'Enter the PEM file name (with path if not in the current directory):'
     });
+
+
+    for (let i = 0; i < numOfInstances; i++) {
+        const instance = await askForInstance();
+        instances.push(instance);
+    }
 
     const { osChoice } = await inquirer.prompt({
         type: 'list',
@@ -158,5 +158,25 @@ async function manageEC2Instances() {
         }).unref(); 
     }
 };
+
+/////////////////////////////////////   Logging ////////////////////////////////////////////////   
+    
+// Event listener for 'connectionAttempt'
+monitor.on('connectionAttempt', (address, username) => {
+    const logEntry = `Attempting connection to ${address} as ${username}`;
+    console.log(logEntry);
+    logToFile('Connection Attempt', logEntry);  // Append the log entry to a file
+});
+
+monitor.on('reconnected', (address) => {
+    const logEntry = `Successfully reconnected to ${address}.`;
+    console.log(`Successfully reconnected to ${address}.`);
+    logToFile('Connection Attempt', logEntry); 
+});
+
+monitor.on('reconnectFailed', (address) => {
+    console.error(`Failed to reconnect to ${address} after multiple attempts.`);
+    logToFile('Connection Attempt', logEntry);  
+});
 
 mainMenu()
