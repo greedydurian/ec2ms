@@ -4,6 +4,9 @@ import { spawn } from 'child_process'; // Import the spawn function
 import fs from 'fs';
 import { loadCachedTags, saveCachedTags, manageTags, cachedTags } from './cacheManager.js';
 import { monitor, logToFile } from './monitor.js';
+import { loadSession, saveSession, getUserPassphrase} from './session.js';
+
+
 
 (async function() {
     console.log(`
@@ -16,19 +19,51 @@ import { monitor, logToFile } from './monitor.js';
  `   );
 })();
 
+let isBusy = false;
+let passphrase = null;
 
-async function mainMenu() {
+async function initializeSession() {
+    let sessionData = null; 
+
+    if (fs.existsSync('session.json')) {
+        passphrase = await getUserPassphrase('Enter your passphrase to unlock the saved session:');
+        sessionData = await loadSession(passphrase); 
+
+        if (!sessionData) {
+            console.log('Failed to load session. Starting a new one.');
+        }
+    } else {
+        passphrase = await getUserPassphrase('Set your passphrase:');
+        console.log('\x1b[31m%s\x1b[0m', '⚠️ WARNING: Do not forget your passphrase, as it is required to decrypt your session. IF YOU FORGET IT, IT WILL NOT BE RECOVERABLE ⚠️'); 
+
+    }
+    await mainMenu(sessionData || null); // call main menu
+}
+
+async function mainMenu(sessionData) {
+    if (isBusy) {
+        return; // Skip calling mainMenu if isBusy is true
+    }
+
     const { mainChoice } = await inquirer.prompt([
         {
             type: 'list',
             name: 'mainChoice',
             message: 'What would you like to do?',
-            choices: ['Manage EC2 instances', 'Manage saved tags', 'Exit'],
+            choices: ['Continue from last session', 'Manage EC2 instances', 'Manage saved tags', 'Exit'],
             default: 'Manage EC2 instances'
         }
     ]);
 
     switch (mainChoice) {
+        case 'Continue from last session':
+            if (sessionData) {
+                await manageEC2Instances(sessionData.instances, sessionData.pem);
+            } else {
+                console.log('No valid session data found. Starting a new session.');
+                await manageEC2Instances();
+            }
+            break;
         case 'Manage EC2 instances':
             await manageEC2Instances();
             break;
@@ -40,10 +75,8 @@ async function mainMenu() {
             process.exit(0);
     }
 
-    await mainMenu();  // loop back to main menu
+    await mainMenu();  // Loop back to main menu
 }
-
-
 
 async function askForInstance() {
     loadCachedTags();
@@ -93,25 +126,44 @@ async function askForInstance() {
     return instance;
 }
 
-async function manageEC2Instances() {
-    const instances = [];
-    const { numOfInstances } = await inquirer.prompt({
-        type: 'input',
-        name: 'numOfInstances',
-        message: 'How many EC2 instances do you want to connect to?',
-        validate: value => !isNaN(value) ? true : 'Please enter a valid number.'
-    });
+async function manageEC2Instances(savedInstances = null, savedPem = null) {
+    let instances;
+    let pem;
+    isBusy = true;
 
-    const { pem } = await inquirer.prompt({
-        type: 'input',
-        name: 'pem',
-        message: 'Enter the PEM file name (with path if not in the current directory):'
-    });
+    if (savedInstances && savedPem) {
+        console.log('Continuing from last session...');
+        instances = savedInstances;
+        pem = savedPem;
+        // Use instances and pem to directly connect to EC2
+    } else {
+        instances = [];
+        
+        const { numOfInstances } = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'numOfInstances',
+                message: 'How many EC2 instances do you want to connect to?',
+                validate: value => !isNaN(value) ? true : 'Please enter a valid number.'
+            }
+        ]);
 
+        const pemPrompt = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'pem',
+                message: 'Enter the PEM file name (with path if not in the current directory):'
+            }
+        ]);
+        pem = pemPrompt.pem;
 
-    for (let i = 0; i < numOfInstances; i++) {
-        const instance = await askForInstance();
-        instances.push(instance);
+        for (let i = 0; i < numOfInstances; i++) {
+            const instance = await askForInstance();
+            instances.push(instance);
+        }
+        
+        // Save the session data after collecting all necessary details
+        saveSession({ instances, pem }, passphrase); 
     }
 
     const { osChoice } = await inquirer.prompt({
@@ -149,7 +201,6 @@ async function manageEC2Instances() {
         } else if (osChoice === 'Windows') {
             shellOption = true;
         }
-    
         console.log('executing', cmd, args);
         spawn(cmd, args, {
             shell: shellOption,
@@ -157,6 +208,8 @@ async function manageEC2Instances() {
             stdio: 'inherit'
         }).unref(); 
     }
+    isBusy = false; 
+    monitor.emit('finishedManaging');
 };
 
 /////////////////////////////////////   Logging ////////////////////////////////////////////////   
@@ -179,4 +232,11 @@ monitor.on('reconnectFailed', (address) => {
     logToFile('Connection Attempt', logEntry);  
 });
 
-mainMenu()
+
+(async () => {
+    try {
+        await initializeSession(); // Initiating the main menu for the first time
+    } catch (err) {
+        console.error('An error occurred:', err);
+    }
+})();
