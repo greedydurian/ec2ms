@@ -1,7 +1,7 @@
 {
   "name": "ec2ms",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A tool to SSH into multiple EC2 instances.",
   "main": "index.js",
   "bin": {
