@@ -85,7 +85,7 @@ async function askForInstance() {
         {
             type: 'list',
             name: 'action',
-            message: 'Do you want to use a saved tag or enter new values?',
+            message: 'Do you want to use a saved tag or enter new values? (Eg. test1) ',
             choices: [...Object.keys(cachedTags), 'Enter new values'],
             default: 'Enter new values'
         }
@@ -98,13 +98,13 @@ async function askForInstance() {
     const address = await inquirer.prompt({
         type: 'input',
         name: 'address',
-        message: 'Enter the EC2 address:'
+        message: 'Enter the EC2 address (Eg. ec2-33-44-55-66.ap-southeast-1.compute.amazonaws.com):'
     });
 
     const username = await inquirer.prompt({
         type: 'input',
         name: 'username',
-        message: 'Enter the SSH username for this instance:',
+        message: 'Enter the SSH username for this instance (Eg. ubuntu):',
         default: 'ubuntu'
     });
 

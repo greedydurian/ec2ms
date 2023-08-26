@@ -1,0 +1,4 @@
+node_modules
+cachedTags.json
+connection-attempts.log
+session.json
