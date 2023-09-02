@@ -21,3 +21,9 @@ ec2ms allows the user to spin up multiple terminals and SSH into it automaticall
 
 Select number of instances you want to spin up -> Use a saved tag or create a new one -> Input EC2 name -> Input username -> Input PEM key 
 
+## Install
+``` npm install ec2ms```
+
+## Run
+
+Just type ``` ec2ms ``` in your terminal

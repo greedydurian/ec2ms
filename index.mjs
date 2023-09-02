@@ -1,21 +1,40 @@
+#!/usr/bin/env node
+
 import os from 'os';
 import inquirer from 'inquirer';
 import { spawn } from 'child_process'; // Import the spawn function
 import fs from 'fs';
-import { loadCachedTags, saveCachedTags, manageTags, cachedTags } from './cacheManager.js';
-import { monitor, logToFile } from './monitor.js';
-import { loadSession, saveSession, getUserPassphrase} from './session.js';
+import { loadCachedTags, saveCachedTags, manageTags, cachedTags } from './cacheManager.mjs';
+import { monitor, logToFile } from './monitor.mjs';
+import { loadSession, saveSession, getUserPassphrase} from './session.mjs';
+import { checkRAMandMemory } from './checkRam.mjs';
 
-
+import('inquirer-file-tree-selection-prompt').then((promptModule) => {
+    inquirer.registerPrompt('file-tree-selection', promptModule.default);
+    
+    // Kick off the main function that starts your CLI interaction
+    initializeSession().catch((error) => {
+      console.error('Failed to initialize session:', error);
+    });
+  
+  }).catch((error) => {
+    console.error('Failed to load inquirer-file-tree-selection-prompt:', error);
+  });
 
 (async function() {
     console.log(`
-    __  ____  __ ____   ____   ___ 
-   / / / /\ \/ // __ \ / __ \ /   |
-  / /_/ /  \  // / / // /_/ // /| |
- / __  /   / // /_/ // _, _// ___ |
-/_/ /_/   /_//_____//_/ |_|/_/  |_|
-                                   
+    ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄       ▄▄  ▄▄▄▄▄▄▄▄▄▄▄ 
+    ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░▌     ▐░░▌▐░░░░░░░░░░░▌
+    ▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀█░▌▐░▌░▌   ▐░▐░▌▐░█▀▀▀▀▀▀▀▀▀ 
+    ▐░▌          ▐░▌                    ▐░▌▐░▌▐░▌ ▐░▌▐░▌▐░▌          
+    ▐░█▄▄▄▄▄▄▄▄▄ ▐░▌                    ▐░▌▐░▌ ▐░▐░▌ ▐░▌▐░█▄▄▄▄▄▄▄▄▄ 
+    ▐░░░░░░░░░░░▌▐░▌           ▄▄▄▄▄▄▄▄▄█░▌▐░▌  ▐░▌  ▐░▌▐░░░░░░░░░░░▌
+    ▐░█▀▀▀▀▀▀▀▀▀ ▐░▌          ▐░░░░░░░░░░░▌▐░▌   ▀   ▐░▌ ▀▀▀▀▀▀▀▀▀█░▌
+    ▐░▌          ▐░▌          ▐░█▀▀▀▀▀▀▀▀▀ ▐░▌       ▐░▌          ▐░▌
+    ▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄▄▄ ▐░▌       ▐░▌ ▄▄▄▄▄▄▄▄▄█░▌
+    ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░▌       ▐░▌▐░░░░░░░░░░░▌
+     ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀  ▀▀▀▀▀▀▀▀▀▀▀ 
+                                      
  `   );
 })();
 
@@ -50,7 +69,7 @@ async function mainMenu(sessionData) {
             type: 'list',
             name: 'mainChoice',
             message: 'What would you like to do?',
-            choices: ['Continue from last session', 'Manage EC2 instances', 'Manage saved tags', 'Exit'],
+            choices: ['Continue from last session', 'Manage EC2 instances', 'Manage saved tags', 'Check Ram', 'Exit'],
             default: 'Manage EC2 instances'
         }
     ]);
@@ -69,6 +88,9 @@ async function mainMenu(sessionData) {
             break;
         case 'Manage saved tags':
             await manageTags();
+            break;
+        case 'Check Ram':
+            await checkRAMandMemory();
             break;
         case 'Exit':
             console.log('Goodbye!');
@@ -129,6 +151,20 @@ async function askForInstance() {
 async function manageEC2Instances(savedInstances = null, savedPem = null) {
     let instances;
     let pem;
+    let rootDirectory;
+
+    switch(os.platform()) {
+        case 'win32':
+            rootDirectory = 'C:/';
+            break;
+        case 'darwin':  // macOS
+        case 'linux':
+            rootDirectory = process.env.HOME;
+            break;
+        default:
+            rootDirectory = './';  // Default to current directory for other platforms
+    }
+
     isBusy = true;
 
     if (savedInstances && savedPem) {
@@ -148,15 +184,38 @@ async function manageEC2Instances(savedInstances = null, savedPem = null) {
             }
         ]);
 
-        const pemPrompt = await inquirer.prompt([
+        const { pemMethod } = await inquirer.prompt([
             {
-                type: 'input',
-                name: 'pem',
-                message: 'Enter the PEM file name (with path if not in the current directory):'
+                type: 'list',
+                name: 'pemMethod',
+                message: 'How would you like to provide the PEM file?',
+                choices: ['Type the path manually', 'Select from directory'],
+                default: 'Type the path manually'
             }
         ]);
-        pem = pemPrompt.pem;
 
+        if (pemMethod === 'Type the path manually') {
+            const pemPrompt = await inquirer.prompt([
+                {
+                    type: 'input',
+                    name: 'pem',
+                    message: 'Enter the PEM file name (with path if not in the current directory):'
+                }
+            ]);
+            pem = pemPrompt.pem;
+        } else {
+            const { pemPath } = await inquirer.prompt([
+                {
+                    type: 'file-tree-selection',
+                    name: 'pemPath',
+                    message: 'Select your PEM file',
+                    onlyShowDir: false,
+                    root: rootDirectory
+                }
+            ]);
+            pem = pemPath;
+        }
+    
         for (let i = 0; i < numOfInstances; i++) {
             const instance = await askForInstance();
             instances.push(instance);
@@ -201,6 +260,7 @@ async function manageEC2Instances(savedInstances = null, savedPem = null) {
         } else if (osChoice === 'Windows') {
             shellOption = true;
         }
+    
         console.log('executing', cmd, args);
         spawn(cmd, args, {
             shell: shellOption,
@@ -231,12 +291,3 @@ monitor.on('reconnectFailed', (address) => {
     console.error(`Failed to reconnect to ${address} after multiple attempts.`);
     logToFile('Connection Attempt', logEntry);  
 });
-
-
-(async () => {
-    try {
-        await initializeSession(); // Initiating the main menu for the first time
-    } catch (err) {
-        console.error('An error occurred:', err);
-    }
-})();

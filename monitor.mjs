@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import { Client } from 'ssh2';
